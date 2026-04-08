@@ -593,7 +593,7 @@ running `wget` so the file lands in the right place.
 3. Replace `FirstName LastName` in the YAML `author:` field with your name
 4. **Save As** — replace `FirstName_LastName` in the filename with your name, and **save inside the project directory `~/DSC-011-Sp26/DSC-011-Sp26-Baby-Names`.
 5. Render to HTML
-6. Open the rendered HTML from your terminal with `w3m` and if you like one of these other methods:
+6. Open the rendered HTML from your terminal with `w3m` and one of these other methods to check the correctness of your work:
 
 **All platforms — `w3m`:**
 
@@ -683,7 +683,7 @@ echo ""
 
 # Validate with check_bash
 answer=$(tree --charset ascii scripts/ data/ 2>/dev/null)
-check_bash "$answer" "HASH_TREE_SCAFFOLD_TBD"
+check_bash "$answer" "09b5c18a80641999e9b1a9dfe3807b16ee17aac2aec53684e7a86faa28642ed3"
 ```
 
 ::: {.callout-note}
