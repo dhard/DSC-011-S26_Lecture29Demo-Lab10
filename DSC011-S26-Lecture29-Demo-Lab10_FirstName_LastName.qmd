@@ -1,5 +1,5 @@
 ---
-title: "DSC 011 S26 — Lecture 29 Demo + Lab 10"
+title: "DSC 011 S26 — Lecture 29 Demo + Lab 10, v2"
 subtitle: "Reproducible Project Setup: Tools, Scripts, Data, and Distribution"
 author: "FirstName LastName"
 date: today
@@ -820,7 +820,7 @@ untracked. We gitignore data directories (large, regenerable), virtual
 environments (machine-specific), and editor backup files.
 
 ```
-mg .gitignore
+emacs .gitignore
 ```
 
 Paste the following, save
@@ -1104,7 +1104,7 @@ and the data directory scaffold. It is the entry point for reproducibility.
 ### 12a. Open and write the script
 
 ```
-mg scripts/00-setup.sh
+emacs scripts/00-setup.sh
 ```
 
 ```bash
@@ -1163,7 +1163,7 @@ bash scripts/00-setup.sh
 ```{bash verify-setup-sh, error=TRUE}
 answer=$(bash scripts/00-setup.sh 2>&1 | tail -3)
 echo "$answer"
-check_bash "$answer" "HASH_SETUP_SH_TAIL3_TBD"
+check_bash "$answer" "1d52f7c7f2447ed63742cba94bdf0d93ed5c6eb3159571ce07f6dc03c0f1cfe6"
 ```
 
 #### Reporter's Block/Resolution Log — Step 12
@@ -1194,7 +1194,7 @@ files and produce wrong counts. Specificity is a safety net.
 ### 13b. Open and write the script
 
 ```
-mg scripts/01-obtain.sh
+emacs scripts/01-obtain.sh
 ```
 
 ```bash
@@ -1288,7 +1288,7 @@ ls data/raw/names[12][890][0-9]0s.html 2>/dev/null \
 ### 14a. Open and write the script
 
 ```
-mg scripts/02-scrub.sh
+emacs scripts/02-scrub.sh
 ```
 
 ```bash
@@ -1360,7 +1360,7 @@ will be converted.
 answer=$(find data/processed -name 'names[12][890][0-9]0s.txt' \
              2>/dev/null | wc -l | tr -d ' ')
 echo "Text files in data/processed/: $answer"
-check_bash "$answer" "HASH_TXT_COUNT_TBD"
+check_bash "$answer" "8527a891e224136950ff32ca212b45bc93f69fbb801c3b1ebedac52775f99e61"
 ```
 
 ### 14d. Validate total data lines across all files
@@ -1370,15 +1370,10 @@ decades we expect 2800 total data lines:
 
 ```{bash verify-data-lines, error=TRUE}
 echo "Counting data lines across all 14 text files..."
-answer=$(grep -l "^ *[0-9]" \
-             data/processed/names[12][890][0-9]0s.txt \
-         2>/dev/null \
-         | xargs grep -c "^ *[0-9]" 2>/dev/null \
-         | awk -F: '{s+=$2} END{print s}' \
-         | tr -d ' ')
+answer=$(grep -E "^ *[0-9]* \|" data/processed/*.txt | wc -l)
 echo "Total data lines: $answer"
 echo "(Expected: 2800 — 200 per decade × 14 decades)"
-check_bash "$answer" "HASH_TOTAL_DATA_LINES_TBD"
+check_bash "$answer" "e2f4164d8dfec3c74e9fc3edb5b11b0e91993d69b6603297a2914f6bcae53e8b"
 ```
 
 #### Reporter's Block/Resolution Log — Step 14
@@ -1420,7 +1415,7 @@ check_bash "$answer" "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec
 ### 16a. Write the README
 
 ```
-mg README.md
+emacs README.md
 ```
 
 ```markdown
@@ -1531,14 +1526,14 @@ echo ""
 answer_txt=$(find data/processed -name 'names[12][890][0-9]0s.txt' \
                  2>/dev/null | wc -l | tr -d ' ')
 echo "Text files in data/processed/: $answer_txt"
-check_bash "$answer_txt" "HASH_TXT_COUNT_TBD"
+check_bash "$answer_txt" "8527a891e224136950ff32ca212b45bc93f69fbb801c3b1ebedac52775f99e61"
 
 echo ""
 echo "Final project tree:"
 tree --charset ascii data/ scripts/ 2>/dev/null
 echo ""
 answer_tree=$(tree --charset ascii data/ scripts/ 2>/dev/null)
-check_bash "$answer_tree" "HASH_TREE_FINAL_TBD"
+check_bash "$answer_tree" "ac083cee06f9411f7e86ffa000c473f16b6b7ee9e316b5afaeaaab891fda860f"
 ```
 
 #### Reporter's Block/Resolution Log — Step 16
