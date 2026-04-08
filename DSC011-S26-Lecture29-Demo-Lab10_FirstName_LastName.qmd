@@ -675,6 +675,8 @@ mkdir -p data/raw data/processed data/clean
 
 ### 7c. Validate the full scaffold
 
+Make sure to use quarto CLI for rendering to preserve characters in the tree output, some locales and architectures may corrupt the ouutput and cause INCORRECT with correct project structure. Don't use RSTudio to render.
+
 ```{bash verify-scaffold, error=TRUE}
 echo "=== Project scaffold ==="
 echo ""
@@ -686,9 +688,6 @@ answer=$(tree --charset ascii scripts/ data/ 2>/dev/null)
 check_bash "$answer" "09b5c18a80641999e9b1a9dfe3807b16ee17aac2aec53684e7a86faa28642ed3"
 ```
 
-::: {.callout-note}
-The hash above is a placeholder to be filled in before distribution.
-:::
 
 #### Reporter's Block/Resolution Log — Step 7
 
@@ -701,7 +700,7 @@ The hash above is a placeholder to be filled in before distribution.
 ::: {.callout-important}
 ## ★ LECTURE 29 DEMO SUBMISSION POINT
 
-**Render this notebook now and submit the HTML to CatCourses.**
+**Render this notebook now usingf the quarto CLI and submit the HTML to CatCourses.**
 
 - **Due:** 2:30 pm today, April 9, 2026
 - **Late deadline:** 11:59 pm April 10, 2026
