@@ -1,0 +1,1595 @@
+---
+title: "DSC 011 S26 — Lecture 29 Demo + Lab 10"
+subtitle: "Reproducible Project Setup: Tools, Scripts, Data, and Distribution"
+author: "FirstName LastName"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 4
+    code-fold: false
+    theme: cosmo
+    embed-resources: true
+    include-in-header:
+      text: |
+        <style>
+        kbd {
+          display: inline-block;
+          padding: 2px 6px;
+          font-size: 0.85em;
+          font-family: monospace;
+          background-color: #f5f5f5;
+          border: 1px solid #ccc;
+          border-bottom: 2px solid #aaa;
+          border-radius: 3px;
+        }
+        </style>
+execute:
+  echo: true
+  warning: false
+  message: false
+  error: true
+urlcolor: blue
+linkcolor: blue
+engine: knitr
+---
+
+```{r setup, include=FALSE, cache=FALSE, message=FALSE, warning=FALSE, results='hide'}
+options(digits = 5)
+knitr::opts_chunk$set(
+  echo     = TRUE,
+  cache    = FALSE,
+  warning  = FALSE,
+  message  = FALSE,
+  collapse = FALSE,
+  comment  = "",
+  error    = TRUE    # never halt rendering on bash exit code 1
+)
+
+# ── Unset stale virtual environment from other projects ───────────────────────
+Sys.unsetenv("VIRTUAL_ENV")
+
+# ── Fix PATH for bash chunks on macOS (safe no-op on Linux/WSL2) ─────────────
+# RStudio launched from the Dock inherits a minimal launchd PATH that omits
+# /opt/homebrew/bin. This prepends Homebrew paths so knitr bash chunks see
+# bash 5 and system tools like check_bash.
+homebrew_paths <- c("/opt/homebrew/bin", "/usr/local/bin")
+existing <- homebrew_paths[dir.exists(homebrew_paths)]
+if (length(existing) > 0) {
+  old_path <- Sys.getenv("PATH")
+  new_path <- paste(c(existing, old_path), collapse = ":")
+  Sys.setenv(PATH = new_path)
+}
+
+# ── R check infrastructure ────────────────────────────────────────────────────
+# source("dsc011_check_v2.2.R")   # uncomment after wget delivers this file
+```
+
+---
+
+## Preliminaries
+
+### Instructions for This Notebook
+
+This is a **single notebook covering two submissions:**
+
+- **Lecture 29 Demo** — complete Steps 1–7 during class. Submit your
+  rendered HTML by **2:30 pm today (April 9)**. Late submissions accepted
+  until **11:59 pm April 10**.
+- **Lab 10** — complete Steps 8–16 independently in your lab section.
+  Submit by **5:30 pm Wednesday / 4:30 pm Friday**. Late submissions
+  accepted until **Friday April 11 at 11:59 pm**.
+
+You render and submit **the same `.qmd` file twice** — once at the Lecture
+29 submission point (after Step 7), and again when Lab 10 is complete.
+
+::: {.callout-important}
+### Complete Steps 1–5 in your terminal before opening this notebook
+
+This notebook must render from inside the project directory. Open
+`DSC-011-Sp26-Baby-Names.Rproj` only after you have created the project
+directory in Step 5. The render guard below will tell you if anything is
+wrong — it never halts rendering, it just prints a clear diagnostic.
+:::
+
+::: {.callout-tip}
+### Command-line habits for this class
+
+- **Tab-complete** directory and file names in the terminal. If nothing
+  completes, you have a typo or are in the wrong directory.
+- **Copy-paste** paths from this notebook rather than typing them.
+  WSL2 Windows Terminal: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> /
+  <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>.
+  macOS: <kbd>Cmd</kbd>+<kbd>C</kbd> / <kbd>Cmd</kbd>+<kbd>V</kbd>.
+- **Develop in the terminal, memorialize in the notebook.** Write and test
+  commands in your shell first. Once they work, paste them into the chunk.
+- **Read errors before asking for help** — they almost always name the
+  problem exactly.
+- **In UNIX, silence is golden.** No output + exit code 0 = success.
+:::
+
+::: {.callout-note}
+### Role Responsibilities
+
+- **All Team Members** work individually to follow and reproduce the demo.
+- **All Team Members** signal the Reporter or Scrum Master when blocked.
+- **Scrum Master** leads the stand-up (~2 min), timeboxes work, signals
+  instructor when team is ready or needs help.
+- **Reporter** records blockages and resolutions in the log tables below,
+  and summarizes the retrospective at the end.
+- **Developers** test and troubleshoot, help blocked teammates.
+:::
+
+---
+
+## Render Guard
+
+This chunk runs on every render. It never halts rendering — instead it
+prints `✓` or `✗ INCORRECT` with a clear fix message for each check.
+Read it carefully before proceeding with any step.
+
+```{bash render-guard, error=TRUE}
+echo "=== Render Guard ==="
+echo ""
+
+# ── 1. Working directory ──────────────────────────────────────────────────────
+EXPECTED="$HOME/DSC-011-Sp26/DSC-011-Sp26-Baby-Names"
+ACTUAL=$(pwd)
+if [[ "$ACTUAL" == "$EXPECTED" ]]; then
+    echo "✓ Working directory: $ACTUAL"
+else
+    echo "✗ INCORRECT — Wrong working directory"
+    echo "  Rendering from: $ACTUAL"
+    echo "  Expected:       $EXPECTED"
+    echo "  Fix:"
+    echo "    1. Close this project (File → Close Project)"
+    echo "    2. cd ~/DSC-011-Sp26/DSC-011-Sp26-Baby-Names"
+    echo "    3. Open DSC-011-Sp26-Baby-Names.Rproj"
+    echo "    4. Re-render"
+fi
+
+echo ""
+
+# ── 2. bash version ───────────────────────────────────────────────────────────
+BASH_MAJOR="${BASH_VERSINFO[0]}"
+BASH_MINOR="${BASH_VERSINFO[1]}"
+if [[ "$BASH_MAJOR" -gt 5 ]] || \
+   { [[ "$BASH_MAJOR" -eq 5 ]] && [[ "$BASH_MINOR" -ge 1 ]]; }; then
+    echo "✓ bash $BASH_VERSION at $(which bash)"
+else
+    echo "✗ INCORRECT — bash $BASH_VERSION is too old (need 5.1+)"
+    echo "  macOS fix:"
+    echo "    brew install bash"
+    echo "    echo /opt/homebrew/bin | sudo tee /etc/paths.d/homebrew"
+    echo "    Quit RStudio fully; relaunch: open -a RStudio"
+    echo "  WSL2 fix:"
+    echo "    sudo apt update && sudo apt install --only-upgrade bash"
+fi
+
+echo ""
+
+# ── 3. check_bash ─────────────────────────────────────────────────────────────
+if command -v check_bash &>/dev/null; then
+    echo "✓ $(check_bash --version) at $(which check_bash)"
+else
+    echo "✗ INCORRECT — check_bash not found on PATH"
+    echo "  Fix: complete Step 3 (clone repo, just install-system)"
+    echo "  then re-render."
+fi
+
+echo ""
+
+# ── 4. git available ──────────────────────────────────────────────────────────
+if command -v git &>/dev/null; then
+    echo "✓ $(git --version)"
+else
+    echo "✗ INCORRECT — git not found"
+    echo "  macOS: brew install git"
+    echo "  WSL2:  sudo apt install git"
+fi
+
+echo ""
+echo "=== End Render Guard ==="
+```
+
+---
+
+# LECTURE 29 DEMO
+
+## Background: Why We Are Rebuilding from Scratch
+
+Demo 28 revealed three infrastructure problems that caused nearly all
+student errors. Today we fix all three permanently before continuing to
+build the Baby Names project pipeline.
+
+**Problem 1 — `check_bash` in `~/bin/`** (caused 63% of INCORRECT/Error
+outcomes). knitr bash chunks run as non-interactive subprocesses that never
+source `~/.bashrc`, so `~/bin/` is invisible to them. Fix: install
+`check_bash` system-wide at `/usr/local/bin/` using `just install-system`.
+
+**Problem 2 — Wrong working directory** (56% of students). The notebook
+landed in `Downloads/`, `Desktop/`, or paths with typos because students
+placed it manually. Fix: deliver all notebooks via `wget` directly into
+the project directory, and use a non-halting render guard that diagnoses
+problems clearly without stopping the render.
+
+**Problem 3 — Orphaned `~/DSC011/` path.** The new canonical location for
+all course project work is `~/DSC-011-Sp26/DSC-011-Sp26-Baby-Names`. The
+old path is retired — leave it in place (it has your git history), but
+do not use it for new work.
+
+---
+
+## Step 1: Install `just` and `glow`
+
+**`just`** is a modern command runner — like `make` but purpose-built for
+running named project commands defined in a `Justfile`. We use it today to
+install `check_bash` in a readable, auditable, reproducible way.
+
+**`glow`** renders Markdown beautifully in your terminal. Instead of
+opening GitHub in a browser to read a README before installing something,
+you clone the repo and read its docs at the command line — staying in the
+terminal workflow throughout.
+
+Run the appropriate commands for your platform in your **terminal**:
+
+```
+# macOS
+brew install just glow
+
+# WSL2/Ubuntu — just
+sudo apt update && sudo apt install just
+
+# WSL2/Ubuntu — glow (via Charm apt repo)
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://repo.charm.sh/apt/gpg.key \
+    | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg
+echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] \
+    https://repo.charm.sh/apt/ * *" \
+    | sudo tee /etc/apt/sources.list.d/charm.list
+sudo apt update && sudo apt install glow
+```
+
+Verify:
+
+```{bash verify-just-glow, error=TRUE}
+echo "just:  $(just --version 2>/dev/null || echo 'NOT FOUND')"
+echo "glow:  $(glow --version 2>/dev/null | head -1 || echo 'NOT FOUND')"
+```
+
+#### Reporter's Block/Resolution Log — Step 1
+
+| Block | Resolution |
+|:------|:-----------|
+|       |            |
+
+---
+
+## Step 2: Install `firefox`, `w3m`, and `wslu`
+
+**`firefox`** lets you open rendered HTML output from the terminal with a
+single command after `quarto render`.
+
+**`w3m`** is a terminal-based web browser — it renders HTML directly in
+your terminal without opening any GUI window. It is useful for quickly
+inspecting rendered output without leaving your shell, and works on any
+platform including WSL2 configurations where GUI apps are not yet
+available.
+
+**`wslu`** (WSL2 only) provides `wslview`, which opens any file or URL in
+your Windows default browser directly from the WSL2 terminal, handling the
+Linux→Windows path translation automatically.
+
+**macOS:**
+
+```
+# Skip firefox if already installed at /Applications/Firefox.app
+brew install --cask firefox
+brew install w3m
+```
+
+**WSL2/Ubuntu:**
+
+```
+sudo apt update && sudo apt install firefox w3m wslu
+```
+
+::: {.callout-note}
+### Firefox on WSL2 requires WSLg
+
+WSL2 Firefox opens a native Linux GUI window using WSLg (Windows
+Subsystem for Linux GUI), which you demonstrated in an earlier session.
+Verify WSLg is active: `echo $DISPLAY` should return something like `:0`.
+If empty, run `wsl --shutdown` in PowerShell and reopen WSL2.
+
+`wslview` opens the file in your existing Windows browser without
+requiring WSLg. `w3m` is the most robust of all — it requires no GUI
+and works everywhere.
+:::
+
+### Viewing rendered HTML: four methods
+
+| Method | Command | Works on |
+|---|---|---|
+| `w3m` | `w3m report.html` | macOS + WSL2, no GUI needed |
+| `wslview` | `wslview report.html` | WSL2, opens Windows browser |
+| Linux Firefox | `firefox report.html &` | WSL2 with WSLg active |
+| macOS open | `open -a Firefox report.html` | macOS only |
+
+```{bash verify-firefox-w3m-wslu, error=TRUE}
+echo "firefox: $(firefox --version 2>/dev/null | head -1 || echo 'NOT FOUND')"
+echo "w3m:     $(w3m -version 2>/dev/null | head -1 || echo 'NOT FOUND')"
+# WSL2 students: uncomment the next line
+# echo "wslview: $(wslview --version 2>/dev/null | head -1 || echo 'NOT FOUND')"
+```
+
+#### Reporter's Block/Resolution Log — Step 2
+
+| Block | Resolution |
+|:------|:-----------|
+|       |            |
+
+---
+
+## Step 3: Clone `dsc011-check-bash`, Read the README, and Install
+
+This is the canonical workflow for installing any well-documented
+command-line tool: **clone → read → verify → install**. We practice the
+full sequence so you understand every step.
+
+### 3a. Clone the repository
+
+```
+cd ~
+git clone https://github.com/dhard/dsc011-check-bash.git
+cd dsc011-check-bash
+ls
+```
+
+You should see: `check_bash`, `install_check_bash.sh`, `test_check_bash.sh`,
+`Justfile`, `README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`.
+
+### 3b. List the available `just` recipes
+
+```
+just --list
+```
+
+You will see: `install`, `install-system`, `uninstall`, `test`, `check`,
+`version`. Each recipe is a named command defined in the `Justfile`. Run
+`cat Justfile` to see exactly what each recipe does.
+
+### 3c. Read the README with `glow`
+
+```
+glow README.md
+```
+
+Use arrow keys to scroll, <kbd>q</kbd> to quit. Find the **Typical
+workflow** section — it shows exactly the sequence you are about to run.
+
+### 3d. Uninstall any previous `check_bash`
+
+`just uninstall` removes `check_bash` from both `~/bin/` and
+`/usr/local/bin/` (whichever exist) and cleans the PATH entry from your
+shell rc file. Safe to run even if `check_bash` was never installed.
+
+```
+just uninstall
+```
+
+### 3e. Run the test suite
+
+Before installing, verify that `check_bash` works correctly on your system:
+
+```
+just test
+```
+
+This runs 89 tests across 15 sections. All 89 should pass. If any fail,
+stop and ask for help before proceeding.
+
+### 3f. Install system-wide
+
+```
+just install-system
+```
+
+This installs `check_bash` to `/usr/local/bin/` and prompts for your
+password if `sudo` is needed.
+
+::: {.callout-note}
+### Why `/usr/local/bin/` works where `~/bin/` did not
+
+knitr runs each bash chunk as a fresh **non-interactive** subprocess that
+does not source `~/.bashrc` or `~/.zshrc`. It inherits only the PATH that
+R has at render time — which comes from however RStudio was launched, not
+from your shell startup files. `/usr/local/bin/` is in the **system
+default PATH** present in every process on both platforms. `~/bin/` is
+added only by your shell startup file, which runs only in interactive
+sessions. This is why `check_bash` worked in your terminal but caused
+`bash: check_bash: command not found` in 63% of Demo 28 submissions.
+:::
+
+```{bash verify-check-bash, error=TRUE}
+echo "Location: $(which check_bash 2>/dev/null || echo 'NOT FOUND')"
+echo "Version:  $(check_bash --version 2>/dev/null || echo 'NOT FOUND')"
+echo ""
+if [[ -f "$HOME/bin/check_bash" ]]; then
+    echo "⚠ WARNING: check_bash still exists at ~/bin"
+    echo "  Run 'just uninstall' from ~/dsc011-check-bash, then reinstall"
+else
+    echo "✓ check_bash is not in ~/bin (correct — system install only)"
+fi
+```
+
+#### Reporter's Block/Resolution Log — Step 3
+
+| Block | Resolution |
+|:------|:-----------|
+|       |            |
+
+---
+
+## Step 4: Clone the Demo 28 Analysis Repo, Render, and View
+
+The Demo 28 submission analysis — a fully reproducible report showing what
+went wrong and why — lives in a GitHub repository. Today we clone it,
+render it with Quarto, and open the result from the terminal. This is the
+`git clone` → `quarto render` → review workflow you will use for your own
+analysis deliverables.
+
+### 4a. Clone the analysis repo
+
+```
+cd ~
+git clone https://github.com/dhard/DSC011-Sp26-Demo28-Analysis.git
+cd DSC011-Sp26-Demo28-Analysis
+ls
+```
+
+::: {.callout-note}
+The URL above is a placeholder — the actual URL will be announced in
+class and posted to CatCourses.
+:::
+
+### 4b. Render the report
+
+```
+quarto render demo28_report.qmd
+```
+
+### 4c. Open in your browser from the terminal
+
+**All platforms — `w3m` (terminal, no GUI needed):**
+
+```
+w3m ~/DSC011-Sp26-Demo28-Analysis/demo28_report.html
+```
+
+Press <kbd>q</kbd> to quit `w3m`.
+
+**macOS — Firefox:**
+
+```
+open -a Firefox ~/DSC011-Sp26-Demo28-Analysis/demo28_report.html
+```
+
+**WSL2 — `wslview` (opens in Windows default browser, no WSLg needed):**
+
+```
+wslview ~/DSC011-Sp26-Demo28-Analysis/demo28_report.html
+```
+
+**WSL2 — Linux Firefox (requires WSLg):**
+
+```
+firefox ~/DSC011-Sp26-Demo28-Analysis/demo28_report.html &
+```
+
+```{bash verify-analysis-render, error=TRUE}
+f="$HOME/DSC011-Sp26-Demo28-Analysis/demo28_report.html"
+if [[ -f "$f" ]]; then
+    echo "✓ demo28_report.html rendered ($(du -h "$f" | cut -f1))"
+else
+    echo "✗ INCORRECT — demo28_report.html not found"
+    echo "  cd ~/DSC011-Sp26-Demo28-Analysis && quarto render demo28_report.qmd"
+fi
+```
+
+#### Reporter's Block/Resolution Log — Step 4
+
+| Block | Resolution |
+|:------|:-----------|
+|       |            |
+
+---
+
+## Step 5: Create the New Project Directory and Attach an RStudio Project
+
+### 5a. Create the parent and project directories
+
+The `-p` flag creates intermediate directories as needed and does not
+error if they already exist:
+
+```
+mkdir -p ~/DSC-011-Sp26/DSC-011-Sp26-Baby-Names
+cd ~/DSC-011-Sp26/DSC-011-Sp26-Baby-Names
+pwd
+```
+
+The `pwd` output should end with `.../DSC-011-Sp26/DSC-011-Sp26-Baby-Names`.
+
+::: {.callout-important}
+### Old path vs. new path
+
+| | Path |
+|---|---|
+| **Old (orphaned — do not use)** | `~/DSC011/DSC-011-Sp26-Baby-Names` |
+| **New (correct)** | `~/DSC-011-Sp26/DSC-011-Sp26-Baby-Names` |
+
+These differ by one character in the parent. Do not type either path by
+hand — copy-paste from this notebook or tab-complete.
+:::
+
+### 5b. Attach an RStudio project
+
+An RStudio project (`.Rproj` file) anchors the working directory to the
+project root. When you open the `.Rproj` file, RStudio sets the working
+directory automatically — this is what makes the render guard work.
+
+1. In RStudio: **File → New Project → Existing Directory**
+2. Browse to `~/DSC-011-Sp26/DSC-011-Sp26-Baby-Names`
+3. Click **Create Project**
+
+RStudio creates `DSC-011-Sp26-Baby-Names.Rproj` and reopens the project.
+
+```{bash verify-project-dir, error=TRUE}
+EXPECTED="$HOME/DSC-011-Sp26/DSC-011-Sp26-Baby-Names"
+if [[ -d "$EXPECTED" ]]; then
+    echo "✓ Project directory exists: $EXPECTED"
+else
+    echo "✗ INCORRECT — directory not found"
+    echo "  Run: mkdir -p ~/DSC-011-Sp26/DSC-011-Sp26-Baby-Names"
+fi
+if [[ -f "$EXPECTED/DSC-011-Sp26-Baby-Names.Rproj" ]]; then
+    echo "✓ .Rproj file exists"
+else
+    echo "✗ INCORRECT — .Rproj not found"
+    echo "  Create via File → New Project → Existing Directory"
+fi
+```
+
+#### Reporter's Block/Resolution Log — Step 5
+
+| Block | Resolution |
+|:------|:-----------|
+|       |            |
+
+---
+
+## Step 6: Fetch This Notebook with `wget` and Render It
+
+All demo and lab notebooks from this point on are delivered via `wget`
+directly into the project directory. This guarantees the file lands on
+the Linux filesystem in exactly the right location, with correct line
+endings, so it renders without error.
+
+### 6a. Fetch the notebook
+
+Run in your **terminal** from inside the project directory:
+
+```
+cd ~/DSC-011-Sp26/DSC-011-Sp26-Baby-Names
+wget https://COURSE-URL-TBD/DSC011-S26-Lecture29-Demo-Lab10_FirstName_LastName.qmd
+```
+
+::: {.callout-note}
+The URL is a placeholder — the actual URL will be announced in class
+and posted to CatCourses. Always `cd` to the project directory **before**
+running `wget` so the file lands in the right place.
+:::
+
+### 6b. Personalize, render, and open in your browser
+
+1. Open `DSC-011-Sp26-Baby-Names.Rproj` in RStudio
+2. Open this `.qmd` file in the source pane
+3. Replace `FirstName LastName` in the YAML `author:` field with your name
+4. **Save As** — replace `FirstName_LastName` in the filename with your name
+5. Render to HTML
+6. Open the rendered HTML from your terminal:
+
+**All platforms — `w3m`:**
+
+```
+w3m DSC011-S26-Lecture29-Demo-Lab10_YourName.html
+```
+
+**macOS — Firefox:**
+
+```
+open -a Firefox DSC011-S26-Lecture29-Demo-Lab10_YourName.html
+```
+
+**WSL2 — `wslview`:**
+
+```
+wslview DSC011-S26-Lecture29-Demo-Lab10_YourName.html
+```
+
+**WSL2 — Linux Firefox:**
+
+```
+firefox DSC011-S26-Lecture29-Demo-Lab10_YourName.html &
+```
+
+Read the **Render Guard** output at the top of the rendered HTML carefully.
+All four checks should show `✓` before you proceed.
+
+```{bash verify-notebook-fetched, error=TRUE}
+nb=$(ls DSC011-S26-Lecture29-Demo-Lab10_*.qmd 2>/dev/null | head -1)
+if [[ -n "$nb" ]]; then
+    echo "✓ Notebook found: $nb"
+else
+    echo "✗ INCORRECT — notebook .qmd not found in $(pwd)"
+    echo "  Run wget from inside ~/DSC-011-Sp26/DSC-011-Sp26-Baby-Names"
+fi
+```
+
+#### Reporter's Block/Resolution Log — Step 6
+
+| Block | Resolution |
+|:------|:-----------|
+|       |            |
+
+---
+
+## Step 7: Create the `scripts/` Directory, Empty Script Files, and `data/` Tree
+
+We create all project directories and the three pipeline script files now
+as **empty placeholders**. We fill them in during Lab 10. Creating them
+first establishes the project structure and lets git track it from the
+start.
+
+### 7a. Create `scripts/` and empty script files
+
+```
+mkdir -p scripts
+touch scripts/00-setup.sh scripts/01-obtain.sh scripts/02-scrub.sh
+```
+
+`touch` creates a file if it does not exist, or updates its timestamp if
+it does. It is safe to run repeatedly.
+
+### 7b. Create the `data/` directory tree
+
+| Directory | Contents | git-tracked? |
+|---|---|---|
+| `data/raw/` | Original HTML files from SSA — never modified | No (gitignored) |
+| `data/processed/` | Intermediate files (plain text, etc.) | No (gitignored) |
+| `data/clean/` | Final cleaned outputs | No (gitignored) |
+
+Data directories are gitignored because their contents are large and
+regenerable from the scripts. The **scripts that produce them** are what
+we version-control.
+
+```
+mkdir -p data/raw data/processed data/clean
+```
+
+### 7c. Validate the full scaffold
+
+```{bash verify-scaffold, error=TRUE}
+echo "=== Project scaffold ==="
+echo ""
+tree --charset ascii scripts/ data/ 2>/dev/null
+echo ""
+
+# Validate with check_bash
+answer=$(tree --charset ascii scripts/ data/ 2>/dev/null)
+check_bash "$answer" "HASH_TREE_SCAFFOLD_TBD"
+```
+
+::: {.callout-note}
+The hash above is a placeholder to be filled in before distribution.
+:::
+
+#### Reporter's Block/Resolution Log — Step 7
+
+| Block | Resolution |
+|:------|:-----------|
+|       |            |
+
+---
+
+::: {.callout-important}
+## ★ LECTURE 29 DEMO SUBMISSION POINT
+
+**Render this notebook now and submit the HTML to CatCourses.**
+
+- **Due:** 2:30 pm today, April 9, 2026
+- **Late deadline:** 11:59 pm April 10, 2026
+- **What to submit:** the rendered `.html` file (not the `.qmd`)
+
+Before submitting, confirm:
+
+- [ ] Your name is in the `author:` field (not `FirstName LastName`)
+- [ ] The Render Guard shows `✓` for all four checks
+- [ ] Step 3f shows `check_bash` at `/usr/local/bin/`
+- [ ] Step 7c shows the directory scaffold with `tree`
+
+A notebook with some `✗ INCORRECT` outputs is still submittable for
+partial credit — do not wait for perfection. Submit what you have, then
+fix and resubmit before the late deadline.
+:::
+
+---
+
+# LAB 10
+
+::: {.callout-important}
+### Lab 10 is independent work
+
+Complete Steps 8–16 during your lab section or independently. Submit
+**the same `.qmd` file** rendered to HTML again when finished.
+
+- **Due:** 5:30 pm Wednesday April 9 / 4:30 pm Friday April 11
+- **Late deadline:** Friday April 11 at 11:59 pm
+:::
+
+---
+
+## Step 8: Catch-Up Validation and git Repository Check
+
+Before building further, confirm that your Demo 29 work is complete. The
+checks below are non-blocking — `✗ INCORRECT` outputs tell you what to
+fix before proceeding.
+
+```{bash lab10-catchup, error=TRUE}
+echo "=== Lab 10 catch-up validation ==="
+echo ""
+
+# Working directory
+EXPECTED="$HOME/DSC-011-Sp26/DSC-011-Sp26-Baby-Names"
+[[ "$(pwd)" == "$EXPECTED" ]] \
+    && echo "✓ Working directory correct" \
+    || echo "✗ Wrong directory: $(pwd)"
+
+# Scripts
+for f in scripts/00-setup.sh scripts/01-obtain.sh scripts/02-scrub.sh; do
+    [[ -f "$f" ]] && echo "✓ $f" || echo "✗ $f missing"
+done
+
+# Data directories
+for d in data/raw data/processed data/clean; do
+    [[ -d "$d" ]] && echo "✓ $d/" || echo "✗ $d/ missing"
+done
+
+# check_bash
+command -v check_bash &>/dev/null \
+    && echo "✓ check_bash: $(which check_bash)" \
+    || echo "✗ check_bash not on PATH — complete Step 3"
+
+# git available
+command -v git &>/dev/null \
+    && echo "✓ $(git --version)" \
+    || echo "✗ git not found"
+
+# git repo initialized (expected: not yet — we do this in Step 9)
+if git rev-parse --git-dir &>/dev/null 2>&1; then
+    echo "✓ git repo initialized"
+    echo "  Commits so far: $(git log --oneline 2>/dev/null | wc -l | tr -d ' ')"
+else
+    echo "○ git repo not yet initialized (expected — complete Step 9)"
+fi
+```
+
+#### Reporter's Block/Resolution Log — Step 8
+
+| Block | Resolution |
+|:------|:-----------|
+|       |            |
+
+---
+
+## Step 9: Initialize git, Create `.gitignore`, and Make the First Commit
+
+### 9a. What is git and why do we use it?
+
+**git** is the world's most widely used version control system. It records
+a complete history of every change to your project files — who made each
+change and why. For a data science project this means:
+
+- You can always recover any previous version of a script
+- You can see exactly what changed between runs and when
+- Collaborators can work on the same project without overwriting each other
+- The repository is self-documenting: the git log is a lab notebook
+
+Every **commit** is a snapshot of the project at a moment in time. Every
+snapshot has a message. The sequence of commits tells the story of how the
+project was built.
+
+### 9b. Initialize the repository
+
+```
+cd ~/DSC-011-Sp26/DSC-011-Sp26-Baby-Names
+git init
+git config user.email "YOUREMAIL@ucmerced.edu"
+git config user.name "Your Name"
+```
+
+### 9c. Create `.gitignore`
+
+The `.gitignore` file tells git which files and directories to leave
+untracked. We gitignore data directories (large, regenerable), virtual
+environments (machine-specific), and editor backup files.
+
+```
+mg .gitignore
+```
+
+Paste the following, save
+(<kbd>Ctrl</kbd>+<kbd>x</kbd><kbd>Ctrl</kbd>+<kbd>s</kbd>), and quit
+(<kbd>Ctrl</kbd>+<kbd>x</kbd><kbd>Ctrl</kbd>+<kbd>c</kbd>):
+
+```
+# Data — regenerated by scripts, not committed
+data/raw/
+data/processed/
+data/clean/
+
+# Python virtual environment
+.venv/
+__pycache__/
+*.pyc
+.python-version
+
+# R
+.Rproj.user/
+*.Rhistory
+*.RData
+renv/library/
+
+# OS and editor
+.DS_Store
+Thumbs.db
+*~
+*.orig
+```
+
+### 9d. Stage and commit
+
+```
+git add .
+git status
+git commit -m "Initial commit: project scaffold, scripts/, data/, .gitignore"
+```
+
+Read `git status` before committing — confirm that `data/raw/`,
+`data/processed/`, `data/clean/`, and `.venv/` (if it exists) are **not**
+listed (they are gitignored).
+
+```{bash verify-first-commit, error=TRUE}
+answer=$(git log --oneline 2>/dev/null | wc -l | tr -d ' ')
+echo "Commit count: $answer"
+check_bash "$answer" "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+```
+
+#### Reporter's Block/Resolution Log — Step 9
+
+| Block | Resolution |
+|:------|:-----------|
+|       |            |
+
+---
+
+## Step 10: Install `uv` and Set Up the Python Environment
+
+### Background: Why `uv`?
+
+Python projects need two things to be reproducible: a specific Python
+version and specific versions of every library. Traditional tools (`pip`,
+`venv`, `pyenv`, `conda`) each solve part of this problem. `uv` solves
+all of it in one fast, modern tool.
+
+In this project, `uv` manages the Python environment that runs `html2text`,
+the library we use to convert SSA's HTML files to plain text. Any
+collaborator who clones this repo and runs `uv sync` gets an identical
+environment — same Python version, same library versions.
+
+::: {.callout-note}
+### Check for `pyenv` first
+
+`uv` and `pyenv` conflict. Before installing `uv`, verify:
+
+```
+which pyenv       # should return nothing
+echo $PYENV_ROOT  # should return nothing
+```
+
+If either returns a value, stop and ask the instructor for help.
+:::
+
+### 10a. Install `uv`
+
+```
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+After installing, source your shell configuration so `uv` is on PATH:
+
+```
+source $HOME/.local/bin/env
+```
+
+Or open a new terminal tab.
+
+### 10b. Enable shell autocompletion (optional but recommended)
+
+```
+# zsh (macOS default shell)
+echo 'eval "$(uv generate-shell-completion zsh)"' >> ~/.zshrc
+echo 'eval "$(uvx --generate-shell-completion zsh)"' >> ~/.zshrc
+
+# bash (WSL2 default shell)
+echo 'eval "$(uv generate-shell-completion bash)"' >> ~/.bashrc
+echo 'eval "$(uvx --generate-shell-completion bash)"' >> ~/.bashrc
+```
+
+Restart your shell or source the rc file afterward.
+
+### 10c. Verify `uv`
+
+```{bash verify-uv, error=TRUE}
+if command -v uv &>/dev/null; then
+    echo "✓ $(uv --version)"
+    echo "✓ Python via uv: $(uv run python --version 2>/dev/null)"
+else
+    echo "✗ INCORRECT — uv not found on PATH"
+    echo "  Run: curl -LsSf https://astral.sh/uv/install.sh | sh"
+    echo "  Then: source \$HOME/.local/bin/env"
+fi
+```
+
+### 10d. Initialize `uv` in the project and add `html2text`
+
+```
+cd ~/DSC-011-Sp26/DSC-011-Sp26-Baby-Names
+uv init
+uv add html2text
+```
+
+`uv init` creates `pyproject.toml` (project metadata and dependencies) and
+`uv.lock` (exact pinned versions of every dependency and their
+dependencies). `uv add html2text` adds the library as a dependency,
+updates both files, and installs it into `.venv/`.
+
+::: {.callout-note}
+### What these files do
+
+| File | Purpose | git-tracked? |
+|---|---|---|
+| `pyproject.toml` | Declares project name, Python version, dependencies | Yes |
+| `uv.lock` | Pins exact versions of all dependencies | Yes |
+| `.venv/` | The actual virtual environment | No (gitignored) |
+
+`pyproject.toml` and `uv.lock` are committed. `.venv/` is not — it is
+regenerated by `uv sync` on any machine. This is how `uv` achieves
+reproducibility: the lockfile is the source of truth.
+:::
+
+```{bash verify-uv-init, error=TRUE}
+[[ -f pyproject.toml ]] \
+    && echo "✓ pyproject.toml exists" \
+    || echo "✗ pyproject.toml missing — run: uv init"
+
+[[ -f uv.lock ]] \
+    && echo "✓ uv.lock exists" \
+    || echo "✗ uv.lock missing — run: uv init"
+
+uv run html2text --version &>/dev/null \
+    && echo "✓ html2text available via uv run" \
+    || echo "✗ html2text not found — run: uv add html2text"
+```
+
+#### Reporter's Block/Resolution Log — Step 10
+
+| Block | Resolution |
+|:------|:-----------|
+|       |            |
+
+---
+
+## Step 11: Download One HTML File by Hand and Understand the Conversion
+
+Before automating anything, we do one step manually: downloading a single
+HTML file and converting it to plain text. This teaches you exactly what
+the scripts will automate, and what to look for when things go wrong.
+
+### 11a. Download one HTML file
+
+```
+wget https://www.ssa.gov/oact/babynames/decades/names1990s.html \
+     -O data/raw/names1990s.html
+```
+
+The `-O` flag specifies the output filename and path. Always use it with
+`wget` so files land exactly where you intend.
+
+Inspect the first 40 lines of raw HTML:
+
+```
+head -40 data/raw/names1990s.html
+```
+
+Raw HTML is not human-readable as tabular data — the data is buried in
+tags. `html2text` strips the tags and produces readable plain text that
+standard UNIX tools can parse.
+
+### 11b. Understand the Python one-liner
+
+The conversion command is:
+
+```
+uv run python -c \
+    'import sys, html2text; print(html2text.html2text(sys.stdin.read()))' \
+    < data/raw/names1990s.html \
+    > data/processed/names1990s.txt
+```
+
+Each part explained:
+
+| Part | What it does |
+|---|---|
+| `uv run python` | Runs Python from the project `.venv/` — no activation needed |
+| `-c '...'` | Passes a Python program as a string on the command line |
+| `import sys, html2text` | Loads `sys` (for stdin) and the `html2text` library |
+| `sys.stdin.read()` | Reads all of stdin as one string |
+| `html2text.html2text(...)` | Converts the HTML string to plain text |
+| `print(...)` | Writes the result to stdout |
+| `< data/raw/names1990s.html` | Redirects the HTML file into stdin |
+| `> data/processed/names1990s.txt` | Redirects stdout to the output file |
+
+### 11c. Run the conversion by hand
+
+```
+uv run python -c \
+    'import sys, html2text; print(html2text.html2text(sys.stdin.read()))' \
+    < data/raw/names1990s.html \
+    > data/processed/names1990s.txt
+```
+
+Inspect the output:
+
+```
+head -30 data/processed/names1990s.txt
+```
+
+You should see a table with columns for rank, boys name, boys count,
+girls name, and girls count — separated by pipe characters (`|`). This
+is the structure the scrub pipeline will parse next week.
+
+```{bash verify-manual-conversion, error=TRUE}
+if [[ -f data/processed/names1990s.txt ]]; then
+    wc=$(wc -l < data/processed/names1990s.txt | tr -d ' ')
+    echo "✓ names1990s.txt exists ($wc lines)"
+    echo ""
+    echo "First 5 lines:"
+    head -5 data/processed/names1990s.txt
+else
+    echo "✗ INCORRECT — names1990s.txt not found"
+    echo "  Run the uv run python conversion above"
+fi
+```
+
+Count how many data lines this file contains (lines starting with a rank
+number):
+
+```{bash count-data-lines-single, error=TRUE}
+answer=$(grep -c "^ *[0-9]" data/processed/names1990s.txt 2>/dev/null \
+         | tr -d ' ')
+echo "Data lines in names1990s.txt: $answer"
+echo "(Each decade has 200 ranks — 100 boys + 100 girls)"
+```
+
+#### Reporter's Block/Resolution Log — Step 11
+
+| Block | Resolution |
+|:------|:-----------|
+|       |            |
+
+---
+
+## Step 12: Write and Run `00-setup.sh`
+
+`00-setup.sh` is the **environment bootstrap script**. Any collaborator
+who clones this repository runs it once to recreate the Python environment
+and the data directory scaffold. It is the entry point for reproducibility.
+
+### 12a. Open and write the script
+
+```
+mg scripts/00-setup.sh
+```
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 00-setup.sh — Bootstrap the project environment
+# DSC 011 Sp26 — DSC-011-Sp26-Baby-Names
+#
+# Run once after cloning the project or setting up a new machine.
+# Creates the data directory scaffold and installs the Python environment.
+#
+# Usage (from any directory):
+#   bash scripts/00-setup.sh
+
+PROJ_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$PROJ_ROOT"
+
+echo "=== 00-setup.sh: bootstrapping project environment ==="
+echo "Project root: $PROJ_ROOT"
+echo ""
+
+# ── Create data directory scaffold ───────────────────────────────────────────
+echo "--- Creating data directories ---"
+mkdir -p data/raw data/processed data/clean
+echo "✓ data/raw"
+echo "✓ data/processed"
+echo "✓ data/clean"
+echo ""
+
+# ── Install Python environment via uv ────────────────────────────────────────
+echo "--- Installing Python environment (uv sync) ---"
+uv sync
+echo "✓ Python environment ready"
+echo ""
+
+# ── Environment diagnostics ───────────────────────────────────────────────────
+echo "--- Environment ---"
+echo "bash:    $BASH_VERSION"
+echo "uv:      $(uv --version)"
+echo "python:  $(uv run python --version)"
+echo "git:     $(git --version)"
+echo ""
+echo "=== 00-setup.sh complete ==="
+```
+
+Save (<kbd>Ctrl</kbd>+<kbd>x</kbd><kbd>Ctrl</kbd>+<kbd>s</kbd>) and quit
+(<kbd>Ctrl</kbd>+<kbd>x</kbd><kbd>Ctrl</kbd>+<kbd>c</kbd>).
+
+### 12b. Run and validate
+
+```
+bash scripts/00-setup.sh
+```
+
+```{bash verify-setup-sh, error=TRUE}
+answer=$(bash scripts/00-setup.sh 2>&1 | tail -3)
+echo "$answer"
+check_bash "$answer" "HASH_SETUP_SH_TAIL3_TBD"
+```
+
+#### Reporter's Block/Resolution Log — Step 12
+
+| Block | Resolution |
+|:------|:-----------|
+|       |            |
+
+---
+
+## Step 13: Write and Run `01-obtain.sh`
+
+`01-obtain.sh` downloads all 14 decades of baby name HTML files from the
+SSA website. It is **idempotent**: files that already exist are skipped.
+
+### 13a. The specific shell glob
+
+We use a **specific glob** to match only the decade-pattern filenames:
+
+```
+names[12][890][0-9]0s.html
+```
+
+This matches names1880s through names2010s — exactly 14 files. A vague
+glob like `names*.html` would also match any accidentally present extra
+files and produce wrong counts. Specificity is a safety net.
+
+### 13b. Open and write the script
+
+```
+mg scripts/01-obtain.sh
+```
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 01-obtain.sh — Download raw SSA baby name HTML files
+# DSC 011 Sp26 — DSC-011-Sp26-Baby-Names
+#
+# Downloads one HTML file per decade (1880s–2010s) from SSA.
+# Idempotent: skips files that already exist.
+# Sleeps 1 second between new downloads (polite to SSA's server).
+#
+# Usage (from any directory):
+#   bash scripts/01-obtain.sh
+
+PROJ_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RAW_DIR="$PROJ_ROOT/data/raw"
+
+echo "=== 01-obtain.sh: downloading raw HTML files ==="
+
+EXISTING=$(find "$RAW_DIR" -name 'names[12][890][0-9]0s.html' \
+               2>/dev/null | wc -l | tr -d ' ')
+
+if [[ "$EXISTING" -eq 14 ]]; then
+    echo "All 14 HTML files already present — skipping downloads."
+    exit 0
+fi
+
+echo "Downloading ($EXISTING of 14 already present)..."
+echo ""
+
+for decade in {188..201}0; do
+    html="$RAW_DIR/names${decade}s.html"
+    url="https://www.ssa.gov/oact/babynames/decades/names${decade}s.html"
+
+    if [[ -f "$html" ]]; then
+        echo "  skip: names${decade}s.html"
+    else
+        echo "  downloading names${decade}s.html ..."
+        sleep 1
+        wget --quiet --output-document="$html" "$url"
+        echo "  saved:  names${decade}s.html"
+    fi
+done
+
+N=$(find "$RAW_DIR" -name 'names[12][890][0-9]0s.html' \
+        2>/dev/null | wc -l | tr -d ' ')
+echo ""
+echo "✓ $N HTML files in data/raw/"
+echo "=== 01-obtain.sh complete ==="
+```
+
+### 13c. Run and validate
+
+```
+bash scripts/01-obtain.sh
+```
+
+`names1990s.html` (downloaded in Step 11) will be skipped. The other 13
+will be fetched — this takes about 13 seconds.
+
+```{bash verify-html-count, error=TRUE}
+answer=$(find data/raw -name 'names[12][890][0-9]0s.html' \
+             2>/dev/null | wc -l | tr -d ' ')
+echo "HTML files in data/raw/: $answer"
+check_bash "$answer" "8527a891e224136950ff32ca212b45bc93f69fbb801c3b1ebedac52775f99e61"
+```
+
+Verify the specific glob matches exactly the right files — no extras:
+
+```{bash verify-html-glob, error=TRUE}
+echo "Files matched by specific glob:"
+ls data/raw/names[12][890][0-9]0s.html 2>/dev/null \
+    || echo "(no files matched yet)"
+```
+
+#### Reporter's Block/Resolution Log — Step 13
+
+| Block | Resolution |
+|:------|:-----------|
+|       |            |
+
+---
+
+## Step 14: Begin `02-scrub.sh` — Step 1 (HTML → Plain Text)
+
+`02-scrub.sh` is the data processing pipeline. Today we write only
+**Step 1**: automating the html2text conversion you did by hand in Step 11.
+
+### 14a. Open and write the script
+
+```
+mg scripts/02-scrub.sh
+```
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 02-scrub.sh — Convert, parse, and clean raw baby name data
+# DSC 011 Sp26 — DSC-011-Sp26-Baby-Names
+#
+# Step 1: Convert HTML files to plain text via Python (html2text)
+# Steps 2+: added in future sessions
+#
+# Usage (from any directory):
+#   bash scripts/02-scrub.sh
+# Requirements:
+#   - 00-setup.sh must have been run (.venv/ with html2text installed)
+#   - 01-obtain.sh must have been run (14 HTML files in data/raw/)
+
+PROJ_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RAW_DIR="$PROJ_ROOT/data/raw"
+PROC_DIR="$PROJ_ROOT/data/processed"
+
+# ── Guard: require 01-obtain.sh to have run first ────────────────────────────
+N_RAW=$(find "$RAW_DIR" -name 'names[12][890][0-9]0s.html' \
+            2>/dev/null | wc -l | tr -d ' ')
+if [[ "$N_RAW" -lt 14 ]]; then
+    echo "ERROR: Expected 14 HTML files in data/raw/ but found $N_RAW." >&2
+    echo "       Run 'bash scripts/01-obtain.sh' first." >&2
+    exit 1
+fi
+
+# ── Step 1: Convert each HTML file to plain text ──────────────────────────────
+echo "=== 02-scrub.sh Step 1: converting HTML to plain text ==="
+
+for decade in {188..201}0; do
+    html="$RAW_DIR/names${decade}s.html"
+    text="$PROC_DIR/names${decade}s.txt"
+
+    if [[ -f "$text" ]]; then
+        echo "  skip: names${decade}s.txt already exists"
+    else
+        echo "  converting names${decade}s.html → names${decade}s.txt"
+        uv run --project "$PROJ_ROOT" python \
+            -c 'import sys, html2text; \
+                print(html2text.html2text(sys.stdin.read()))' \
+            < "$html" > "$text"
+    fi
+done
+
+N_TXT=$(find "$PROC_DIR" -name 'names[12][890][0-9]0s.txt' \
+            2>/dev/null | wc -l | tr -d ' ')
+echo ""
+echo "✓ $N_TXT text files in data/processed/"
+echo "=== Step 1 complete ==="
+```
+
+### 14b. Run the script
+
+```
+bash scripts/02-scrub.sh
+```
+
+`names1990s.txt` (converted in Step 11) will be skipped. The other 13
+will be converted.
+
+### 14c. Validate the text file count
+
+```{bash verify-txt-count, error=TRUE}
+answer=$(find data/processed -name 'names[12][890][0-9]0s.txt' \
+             2>/dev/null | wc -l | tr -d ' ')
+echo "Text files in data/processed/: $answer"
+check_bash "$answer" "HASH_TXT_COUNT_TBD"
+```
+
+### 14d. Validate total data lines across all files
+
+A data line starts with a rank number. With 200 ranks per decade and 14
+decades we expect 2800 total data lines:
+
+```{bash verify-data-lines, error=TRUE}
+echo "Counting data lines across all 14 text files..."
+answer=$(grep -l "^ *[0-9]" \
+             data/processed/names[12][890][0-9]0s.txt \
+         2>/dev/null \
+         | xargs grep -c "^ *[0-9]" 2>/dev/null \
+         | awk -F: '{s+=$2} END{print s}' \
+         | tr -d ' ')
+echo "Total data lines: $answer"
+echo "(Expected: 2800 — 200 per decade × 14 decades)"
+check_bash "$answer" "HASH_TOTAL_DATA_LINES_TBD"
+```
+
+#### Reporter's Block/Resolution Log — Step 14
+
+| Block | Resolution |
+|:------|:-----------|
+|       |            |
+
+---
+
+## Step 15: Make the Second Commit
+
+```
+git add scripts/00-setup.sh scripts/01-obtain.sh scripts/02-scrub.sh \
+        pyproject.toml uv.lock
+git status
+git commit -m "Add pipeline scripts: 00-setup, 01-obtain, 02-scrub Step 1"
+```
+
+Read `git status` before committing — `data/` and `.venv/` should not
+appear (they are gitignored).
+
+```{bash verify-second-commit, error=TRUE}
+answer=$(git log --oneline 2>/dev/null | wc -l | tr -d ' ')
+echo "Commit count: $answer"
+check_bash "$answer" "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35"
+```
+
+#### Reporter's Block/Resolution Log — Step 15
+
+| Block | Resolution |
+|:------|:-----------|
+|       |            |
+
+---
+
+## Step 16: Write the README, Package for Distribution, and Demonstrate Reproducibility
+
+### 16a. Write the README
+
+```
+mg README.md
+```
+
+```markdown
+# DSC-011-Sp26-Baby-Names
+
+Reproducible analysis of U.S. Social Security Administration (SSA)
+baby name data across 14 decades (1880s–2010s).
+
+Built in DSC 011: Computing and Statistical Programming, UC Merced,
+Spring 2026.
+
+## Prerequisites
+
+- bash 5.1+
+- git
+- uv (https://docs.astral.sh/uv/getting-started/installation/)
+- wget
+
+## Quick Start
+
+    git clone <repo-url>
+    cd DSC-011-Sp26-Baby-Names
+    bash scripts/00-setup.sh     # create data dirs + install Python env
+    bash scripts/01-obtain.sh    # download 14 HTML files from SSA (~14s)
+    bash scripts/02-scrub.sh     # convert HTML to plain text
+
+## Project Structure
+
+    scripts/
+        00-setup.sh     Bootstrap: data dirs + uv sync
+        01-obtain.sh    Download raw HTML from SSA (idempotent)
+        02-scrub.sh     Convert and clean data (idempotent)
+    data/
+        raw/            HTML files from SSA (gitignored — run 01-obtain.sh)
+        processed/      Intermediate plain text files (gitignored)
+        clean/          Final clean outputs (gitignored)
+
+## Design Principles
+
+All scripts are idempotent (safe to re-run). All scripts use the
+PROJ_ROOT pattern so they can be called from any directory. Data
+is never committed — only the scripts that reproduce it are tracked.
+```
+
+### 16b. Commit the README
+
+```
+git add README.md
+git commit -m "Add README with quick-start instructions"
+```
+
+```{bash verify-readme, error=TRUE}
+[[ -f README.md ]] \
+    && echo "✓ README.md exists" \
+    || echo "✗ README.md not found — write and save it first"
+
+commits=$(git log --oneline 2>/dev/null | wc -l | tr -d ' ')
+echo "Total commits: $commits"
+```
+
+### 16c. Reproducibility demonstration: clean and reconstitute
+
+This is the final proof that the project is truly reproducible. We delete
+all generated data and reconstruct it from the committed scripts alone.
+
+**What we are proving:** any collaborator on any machine can clone this
+repository, run three scripts, and get identical outputs.
+
+**Step 1 — Delete all generated data:**
+
+```
+rm -rf data/raw/ data/processed/ data/clean/ .venv/
+```
+
+```{bash verify-clean, error=TRUE}
+echo "After cleanup:"
+[[ -d .venv ]] \
+    && echo "✗ .venv still exists" \
+    || echo "✓ .venv removed"
+n=$(find data/ -type f 2>/dev/null | wc -l | tr -d ' ')
+[[ "$n" -eq 0 ]] \
+    && echo "✓ data/ is empty — all generated files removed" \
+    || echo "✗ data/ still has $n files"
+```
+
+**Step 2 — Reconstitute using only the scripts:**
+
+```
+bash scripts/00-setup.sh
+bash scripts/01-obtain.sh
+bash scripts/02-scrub.sh
+```
+
+**Step 3 — Validate that outputs are identical:**
+
+```{bash verify-reconstitution, error=TRUE}
+echo "=== Reconstitution validation ==="
+echo ""
+
+answer_html=$(find data/raw -name 'names[12][890][0-9]0s.html' \
+                  2>/dev/null | wc -l | tr -d ' ')
+echo "HTML files in data/raw/: $answer_html"
+check_bash "$answer_html" \
+    "8527a891e224136950ff32ca212b45bc93f69fbb801c3b1ebedac52775f99e61"
+
+echo ""
+
+answer_txt=$(find data/processed -name 'names[12][890][0-9]0s.txt' \
+                 2>/dev/null | wc -l | tr -d ' ')
+echo "Text files in data/processed/: $answer_txt"
+check_bash "$answer_txt" "HASH_TXT_COUNT_TBD"
+
+echo ""
+echo "Final project tree:"
+tree --charset ascii data/ scripts/ 2>/dev/null
+echo ""
+answer_tree=$(tree --charset ascii data/ scripts/ 2>/dev/null)
+check_bash "$answer_tree" "HASH_TREE_FINAL_TBD"
+```
+
+#### Reporter's Block/Resolution Log — Step 16
+
+| Block | Resolution |
+|:------|:-----------|
+|       |            |
+
+---
+
+## Reporter's Mini-Retrospective Summary
+
+**What helped the team succeed today:**
+
+*(write here)*
+
+**What could make the next session run better:**
+
+*(write here)*
+
+---
+
+::: {.callout-important}
+## ★ LAB 10 SUBMISSION POINT
+
+**Render this notebook and submit the HTML to CatCourses.**
+
+- **Due:** 5:30 pm Wednesday April 9 / 4:30 pm Friday April 11
+- **Late deadline:** Friday April 11 at 11:59 pm
+- **What to submit:** the rendered `.html` file (not the `.qmd`)
+
+Before submitting, confirm:
+
+- [ ] Your name is in the `author:` field
+- [ ] Step 8 catch-up shows `✓` for all items from Demo 29
+- [ ] Step 9 shows `✓ CORRECT` for commit count = 1
+- [ ] Step 13c shows `✓ CORRECT` for 14 HTML files
+- [ ] Step 14c shows `✓ CORRECT` for 14 text files
+- [ ] Step 15 shows `✓ CORRECT` for commit count = 2
+- [ ] Step 16c reconstitution shows `✓ CORRECT` for HTML and text counts
+
+Partial credit is awarded for notebooks with some `✗ INCORRECT` outputs.
+:::
+
+---
+
+```{r session-info, echo=FALSE}
+sessionInfo()
+```
