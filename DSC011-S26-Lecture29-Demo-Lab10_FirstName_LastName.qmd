@@ -439,61 +439,58 @@ render it with Quarto, and open the result from the terminal. This is the
 `git clone` → `quarto render` → review workflow you will use for your own
 analysis deliverables.
 
-### 4a. Clone the analysis repo
+### 4a. Clone the analysis repo inside the 
 
 ```
-cd ~
-git clone https://github.com/dhard/DSC011-Sp26-Demo28-Analysis.git
-cd DSC011-Sp26-Demo28-Analysis
+cd ~/DSC-011-Sp26
+git clone <URL>
+cd <DIR>
 ls
 ```
 
 ::: {.callout-note}
-The URL above is a placeholder — the actual URL will be announced in
-class and posted to CatCourses.
+**Do NOT copy, paste and run the above codes!** `<URL>` and `<DIR>` are placeholders to be replaced by copy-and-paste from the instructor's demo. 
 :::
 
-### 4b. Render the report
+### 4c. Examine the reports in Markdown
+
+For example:
 
 ```
-quarto render demo28_report.qmd
+glow -p <FILE>
 ```
 
-### 4c. Open in your browser from the terminal
+Press <kbd>SPACE</kbd> to page through the quarto markdown files.
+Press <kbd>q</kbd> to quit `glow` and return to the shell prompt.
+
+### 4c. Render the reports
+
+For example:
+
+```
+quarto render <FILE>
+```
+
+### 4d Examine the reports in HTML:
+
 
 **All platforms — `w3m` (terminal, no GUI needed):**
 
 ```
-w3m ~/DSC011-Sp26-Demo28-Analysis/demo28_report.html
+w3m ~/DSC-011-Sp26/DSC-011-S26_Lecture28_Demo_Submission_Analysis/demo28_submission_report.html
 ```
 
 Press <kbd>q</kbd> to quit `w3m`.
 
-**macOS — Firefox:**
 
-```
-open -a Firefox ~/DSC011-Sp26-Demo28-Analysis/demo28_report.html
-```
-
-**WSL2 — `wslview` (opens in Windows default browser, no WSLg needed):**
-
-```
-wslview ~/DSC011-Sp26-Demo28-Analysis/demo28_report.html
-```
-
-**WSL2 — Linux Firefox (requires WSLg):**
-
-```
-firefox ~/DSC011-Sp26-Demo28-Analysis/demo28_report.html &
-```
 
 ```{bash verify-analysis-render, error=TRUE}
-f="$HOME/DSC011-Sp26-Demo28-Analysis/demo28_report.html"
+f="$HOME/DSC-011-Sp26/DSC-011-S26_Lecture28_Demo_Submission_Analysis/demo28_submission_report.html"
 if [[ -f "$f" ]]; then
     echo "✓ demo28_report.html rendered ($(du -h "$f" | cut -f1))"
 else
     echo "✗ INCORRECT — demo28_report.html not found"
-    echo "  cd ~/DSC011-Sp26-Demo28-Analysis && quarto render demo28_report.qmd"
+    echo "  cd ~/DSC-011-Sp26/DSC-011-S26_Lecture28_Demo_Submission_Analysis && quarto render demo28_submission_report.qmd"
 fi
 ```
 
@@ -581,23 +578,22 @@ Run in your **terminal** from inside the project directory:
 
 ```
 cd ~/DSC-011-Sp26/DSC-011-Sp26-Baby-Names
-wget https://COURSE-URL-TBD/DSC011-S26-Lecture29-Demo-Lab10_FirstName_LastName.qmd
+wget https://raw.githubusercontent.com/dhard/DSC-011-S26_Lecture29Demo-Lab10/main/DSC011-S26-Lecture29-Demo-Lab10_FirstName_LastName.qmd
 ```
 
 ::: {.callout-note}
-The URL is a placeholder — the actual URL will be announced in class
-and posted to CatCourses. Always `cd` to the project directory **before**
+Always `cd` to the project directory **before**
 running `wget` so the file lands in the right place.
 :::
 
 ### 6b. Personalize, render, and open in your browser
 
 1. Open `DSC-011-Sp26-Baby-Names.Rproj` in RStudio
-2. Open this `.qmd` file in the source pane
+2. Open this `.qmd` file in the source pane by clicking on it in the Files tab/pane.
 3. Replace `FirstName LastName` in the YAML `author:` field with your name
-4. **Save As** — replace `FirstName_LastName` in the filename with your name
+4. **Save As** — replace `FirstName_LastName` in the filename with your name, and **save inside the project directory `~/DSC-011-Sp26/DSC-011-Sp26-Baby-Names`.
 5. Render to HTML
-6. Open the rendered HTML from your terminal:
+6. Open the rendered HTML from your terminal with `w3m` and if you like one of these other methods:
 
 **All platforms — `w3m`:**
 
